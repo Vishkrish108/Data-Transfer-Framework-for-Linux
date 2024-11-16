@@ -48,7 +48,6 @@ class FS:
 
     def cd(self, directory_path):
         try:
-            if directory_path=='..'
             self.current_path = os.path.join(self.current_path, directory_path)
             return "Directory changed successfully"
         except OSError as error:
