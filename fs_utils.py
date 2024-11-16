@@ -51,7 +51,7 @@ class FS:
             new_path = os.path.normpath(os.path.join(self.current_path, directory_path))
             if not os.path.abspath(new_path).startswith(os.path.abspath(self.root_path)):
                 return "Access denied"
-            self.current_path = new_abs_path
+            self.current_path = new_path
             return "Directory changed successfully"
         except OSError as error:
             return str(error)
