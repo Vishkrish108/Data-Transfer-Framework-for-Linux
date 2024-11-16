@@ -35,8 +35,10 @@ class FS:
     def cat(self, file_path):
         try:
             with open(os.path.join(self.current_path, file_path), "rb") as file:
-                return file.read(1024)
+                return file.read(1024).decode("utf-8")
         except OSError as error:
+            return str(error)
+        except UnicodeDecodeError as error:
             return str(error)
 
     def ls(self, directory_path="./"):
