@@ -41,10 +41,27 @@ class Client:
             if response == "invalid credentials":
                 print("Invalid credentials")
                 self.client_socket.close()
+                self.client_socket = None
         except Exception as e:
             print(f"Error connecting to server: {e}")
             if self.client_socket:
                 self.client_socket.close()
+                self.client_socket = None
+
+    def close_connection(self):
+        """
+        Closes the connection to the server gracefully.
+        """
+        if self.client_socket:
+            try:
+                perform_handshake(self.client_socket, "exit")
+                self.client_socket.close()
+            except Exception as e:
+                print(f"Error closing connection: {e}")
+            finally:
+                self.client_socket = None
+            print("Connection closed.")
+
 
     def ping_server(self, dest_ip):
         """
@@ -98,7 +115,9 @@ class Client:
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as fs_sock:
                 fs_sock = wrap_client_ssl(fs_sock)
-                fs_sock.connect((self.client_socket.getpeername()[0], int(port_no)))
+                fs_sock.connect(
+                    (self.client_socket.getpeername()[0], int(port_no))
+                )
                 with open(filename, 'wb') as file:
                     while True:
                         data = fs_sock.recv(CHUNK_SIZE)
@@ -218,11 +237,12 @@ class Server:
                 readable, _, _ = select.select(self.socks, [], [])
                 for sock in readable:
                     conn, addr = sock.accept()
-                    with self.lock:
-                        self.active_connections += 1
-                    threading.Thread(
-                        target=self.handle_client, args=(conn, addr, hostname)
-                    ).start()
+                    # with self.lock:
+                    #     self.active_connections += 1
+                    # threading.Thread(
+                    #     target=self.handle_client, args=(conn, addr, hostname)
+                    # ).start()
+                    self.executor.submit(self.handle_client, conn, addr, hostname)
             except Exception as e:
                 print(f"Error occurred: {e}")
                 break
@@ -248,10 +268,10 @@ class Server:
         perform_handshake(conn, "accept")
         fs = FS(username)  # Use the authenticated username
 
-        while True:
-            try:
+        try:
+            while True:
                 data = receive_handshake(conn)
-                if not data:
+                if not data or data.strip() == "exit":
                     break
                 cmd, *args = data.strip().split()
                 if cmd == "cat":
@@ -261,25 +281,24 @@ class Server:
                     response = fs.ls(*args)
                     perform_handshake(conn, response)
                 elif cmd == "get":
-                    self.handle_get(conn, addr, fs, args)
+                    self.handle_get(conn, fs, args)
                 elif cmd == "put":
-                    self.handle_put(conn, addr, fs, args)
+                    self.handle_put(conn, fs, args)
                 elif cmd == "cd":
                     response = fs.cd(*args)
                     perform_handshake(conn, response)
                 else:
                     perform_handshake(conn, "Unknown command")
-            except Exception as e:
-                perform_handshake(conn, f"Error handling command: {e}")
-                break
+        except Exception as e:
+            perform_handshake(conn, f"Error handling command: {e}")
+        finally:
+            conn.close()
+            with self.lock:
+                self.active_connections -= 1
+                if not self.running and self.active_connections == 0:
+                    self.shutdown_complete.set()
 
-        conn.close()
-        with self.lock:
-            self.active_connections -= 1
-            if not self.running and self.active_connections == 0:
-                self.shutdown_complete.set()
-
-    def handle_get(self, conn, addr, fs, args):
+    def handle_get(self, conn, fs, args):
         """
         Handles the 'get' command to send a file to the client.
         """
@@ -293,17 +312,17 @@ class Server:
 
         try:
             fs_conn, fs_addr = fs_sock.accept()
-            file_data = fs.get(filename)
-            fs_conn.sendall(file_data)
-            fs_conn.shutdown(socket.SHUT_WR)
-            fs_conn.close()
-            fs_sock.close()
+            with fs_conn:
+                file_data = fs.get(filename)
+                fs_conn.sendall(file_data)
+                fs_conn.shutdown(socket.SHUT_WR)
             perform_handshake(conn, "File sent successfully")
         except Exception as e:
             perform_handshake(conn, f"Error sending file '{filename}': {e}")
+        finally:
             fs_sock.close()
 
-    def handle_put(self, conn, addr, fs, args):
+    def handle_put(self, conn, fs, args):
         """
         Handles the 'put' command to receive a file from the client.
         """
@@ -317,17 +336,16 @@ class Server:
 
         try:
             fs_conn, fs_addr = fs_sock.accept()
-            with open(os.path.join(fs.current_path, filename), 'wb') as file:
+            with fs_conn, open(os.path.join(fs.current_path, filename), 'wb') as file:
                 while True:
                     data = fs_conn.recv(CHUNK_SIZE)
                     if not data:
                         break
                     file.write(data)
-            fs_conn.close()
-            fs_sock.close()
             perform_handshake(conn, "File received successfully")
         except Exception as e:
             perform_handshake(conn, f"Error receiving file '{filename}': {e}")
+        finally:
             fs_sock.close()
 
     def handle_client(self, conn, addr, hostname):
