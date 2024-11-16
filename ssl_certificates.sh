@@ -1,0 +1,1 @@
+Error handling command: memoryview: a bytes-like object is required, not 'FileNotFoundError'
