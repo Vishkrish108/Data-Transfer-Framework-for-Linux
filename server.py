@@ -3,6 +3,7 @@ from net_utils import Server
 import signal
 import threading
 
+
 def main():
     ip_list, hostname = ip_utils.get_ip()
     chosen_ip = ip_utils.choose_ip(ip_list)
@@ -14,7 +15,14 @@ def main():
         exit(0)
 
     signal.signal(signal.SIGINT, shutdown_handler)
-    server.start_server(chosen_ip, hostname)
+
+    try:
+        server.start_server(chosen_ip, hostname)
+    except KeyboardInterrupt:
+        server.shutdown_server()
+    except Exception as e:
+        print(f"Server error: {e}")
+        server.shutdown_server()
 
 
 if __name__ == "__main__":
