@@ -50,17 +50,24 @@ class Client:
             command, *args = command.split()
             if command == "get":
                 perform_handshake(self.client_socket, f"{command} {' '.join(args)}")
+                port_no = receive_handshake(self.client_socket)
+                time.sleep(1)
+                fs_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                fs_sock = wrap_client_ssl(fs_sock)
+                fs_sock.connect((self.client_socket.getpeername()[0], int(port_no)))
                 with open(args[0], 'wb') as file:
                     while True:
-                        data = self.client_socket.recv(CHUNK_SIZE)
+                        data = fs_sock.recv(CHUNK_SIZE)
                         if not data:
                             break
                         file.write(data)
-                return f"File {args[0]} received successfully"
+                print("hi!")
+                response = receive_handshake(self.client_socket)
+                return response
             elif command == "put":
                 perform_handshake(self.client_socket, f"{command} {args[0]}")
                 port_no = receive_handshake(self.client_socket)
-                time.sleep(3)
+                time.sleep(1)
                 fs_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 fs_sock = wrap_client_ssl(fs_sock)
                 print(port_no)
@@ -69,10 +76,8 @@ class Client:
                     while (data := file.read(CHUNK_SIZE)):
                         fs_sock.send(data)
                 fs_sock.shutdown(socket.SHUT_WR)
-                response = b""
-                data = self.client_socket.recv(CHUNK_SIZE)
-                response += data
-                return response.decode(errors='ignore')
+                response = receive_handshake(self.client_socket)
+                return response
             else:
                 perform_handshake(self.client_socket, f"{command} {' '.join(args)}")
                 response = b""
@@ -142,6 +147,10 @@ class Server:
                     threading.Thread(
                         target=self.handle_client, args=(conn, addr, sock, hostname)
                     ).start()
+
+                    # self.executor.submit(self.handle_client, conn, addr, sock, hostname)
+                    # for thread pooling. incorporate once get, put etc are working
+
             except Exception as e:
                 print(f"Error occurred: {e}")
                 break
@@ -177,8 +186,17 @@ class Server:
                     print("response:", response)
                     perform_handshake(conn, response)
                 elif command == "get":
+                    fs_sock, fs_port = self.get_fs_socket()
+                    perform_handshake(conn, f"{fs_port}")
+                    while True:
+                        fs_conn, fs_addr = fs_sock.accept()
+                        if fs_addr[0] == addr[0]:
+                            break
                     file_data = fs.get(*args)
-                    conn.sendall(file_data)
+                    fs_conn.sendall(file_data)
+                    fs_conn.shutdown(socket.SHUT_WR)
+                    fs_sock.close()
+                    perform_handshake(conn, "File received successfully")
                 elif command == "put":
                     fs_sock, fs_port = self.get_fs_socket()
                     perform_handshake(conn, f"{fs_port}")
@@ -187,13 +205,14 @@ class Server:
                         fs_conn, fs_addr = fs_sock.accept()
                         if fs_addr[0] == addr[0]:
                             break
-                    with open(os.path.join(fs.Client_Directory, args[0]), 'wb') as file:
+                    with open(os.path.join(fs.current_path, args[0]), 'wb') as file:
                         while True:
                             file_data = fs_conn.recv(CHUNK_SIZE)
                             if not file_data:
                                 break
                             file.write(file_data)
-                    perform_handshake(conn, "File received successfully")
+                    perform_handshake(conn, "File sent successfully")
+                    fs_conn.close()
                 elif command == "cd":
                     response = fs.cd(*args)
                     perform_handshake(conn, response)
