@@ -1,3 +1,8 @@
+# TODO: investigate server shutdown logic (assigned mainly to vishnu)
+# TODO: add the remove file thing (assigned mainly to varun)
+# TODO: prettify the client and make the prompts look good (assigned to vishal/manas)
+
+
 import select
 import socket
 import threading
