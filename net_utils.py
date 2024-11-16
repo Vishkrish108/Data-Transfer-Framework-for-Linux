@@ -384,10 +384,31 @@ class Server:
         """
         print("[ALERT] Shutting down server...")
         self.running = False
-        for sock in self.socks:
-            sock.close()
-        if self.active_connections == 0:
-            self.shutdown_complete.set()
+
+
+        with self.lock:
+            if self.active_connections == 0:
+                self.shutdown_complete.set()
+            else:
+                print(f"[ALERT] Waiting for {self.active_connections} active connection(s) to close...")
+                if hasattr(self, 'client_addresses'):
+                    for addr in self.client_addresses:
+                        print(f" - Connection with {addr}")
+
+        # Periodically display what the server is waiting for
+        while not self.shutdown_complete.is_set():
+            with self.lock:
+                if self.active_connections == 0:
+                    self.shutdown_complete.set()
+                    break
+                else:
+                    print(f"[ALERT] Still waiting for {self.active_connections} active connection(s)...")
+                    if hasattr(self, 'client_addresses'):
+                        for addr in self.client_addresses:
+                            print(f" - Connection with {addr}")
+            time.sleep(1)
+
         self.shutdown_complete.wait()
         self.executor.shutdown(wait=True)
         print("[ALERT] Server shutdown complete.")
+
