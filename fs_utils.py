@@ -6,10 +6,10 @@ class FS:
     def __init__(self, username):
         if not os.path.exists("./server_storage"):
             os.makedirs("./server_storage")
-        self.Client_Directory = os.path.abspath(os.path.join("./server_storage", username))
-        if not os.path.exists(self.Client_Directory):
-            os.makedirs(self.Client_Directory)
-        self.current_path = self.Client_Directory
+        self.root_path = os.path.join("./server_storage", username)
+        if not os.path.exists(self.root_path):
+            os.makedirs(self.root_path)
+        self.current_path = self.root_path
 
     def mkdir(self, directory_path):
         try:
@@ -48,7 +48,10 @@ class FS:
 
     def cd(self, directory_path):
         try:
-            self.current_path = os.path.join(self.current_path, directory_path)
+            new_path = os.path.normpath(os.path.join(self.current_path, directory_path))
+            if not os.path.abspath(new_path).startswith(os.path.abspath(self.root_path)):
+                return "Access denied"
+            self.current_path = new_abs_path
             return "Directory changed successfully"
         except OSError as error:
             return str(error)
