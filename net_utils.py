@@ -2,6 +2,7 @@ import select
 import socket
 import threading
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from handshake_utils import perform_handshake, receive_handshake, create_socket, verify_user
 from fs_utils import FS
@@ -11,9 +12,11 @@ from colors import FG_BLUE, FG_YELLOW, FG_BG_CLEAR
 import signal
 
 class Client:
+
     def __init__(self):
         self.devices = []
         self.client_socket = None
+
 
     def start_connection(self, dest_ip):
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -56,19 +59,19 @@ class Client:
                 return f"File {args[0]} received successfully"
             elif command == "put":
                 perform_handshake(self.client_socket, f"{command} {args[0]}")
+                port_no = receive_handshake(self.client_socket)
+                time.sleep(3)
+                fs_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                fs_sock = wrap_client_ssl(fs_sock)
+                print(port_no)
+                fs_sock.connect((self.client_socket.getpeername()[0], int(port_no)))
                 with open(args[0], 'rb') as file:
                     while (data := file.read(CHUNK_SIZE)):
-                        self.client_socket.send(data)
-                self.client_socket.shutdown(socket.SHUT_WR)
+                        fs_sock.send(data)
+                fs_sock.shutdown(socket.SHUT_WR)
                 response = b""
-                while True:
-                    try:
-                        data = self.client_socket.recv(CHUNK_SIZE)
-                        if not data:
-                            break
-                        response += data
-                    except socket.error:
-                        break
+                data = self.client_socket.recv(CHUNK_SIZE)
+                response += data
                 return response.decode(errors='ignore')
             else:
                 perform_handshake(self.client_socket, f"{command} {' '.join(args)}")
@@ -102,10 +105,20 @@ class Server:
         self.active_connections = 0
         self.lock = threading.Lock()
 
+    def get_fs_socket(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setblocking(True)
+        sock.settimeout(5)
+        sock.bind((self.ip, 0))
+        sock = wrap_server_ssl(sock)
+        sock.listen()
+        return sock, sock.getsockname()[1]
+
     def start_server(self, ip, hostname):
         self.data_socket = create_socket(ip, DATA_PORT)
         self.data_socket = wrap_server_ssl(self.data_socket)
         self.data_socket.listen()
+        self.ip=ip
 
         self.greet_socket = create_socket(ip, GREET_PORT)
         self.greet_socket = wrap_server_ssl(self.greet_socket)
@@ -167,9 +180,16 @@ class Server:
                     file_data = fs.get(*args)
                     conn.sendall(file_data)
                 elif command == "put":
+                    fs_sock, fs_port = self.get_fs_socket()
+                    perform_handshake(conn, f"{fs_port}")
+                    print(fs_port)
+                    while True:
+                        fs_conn, fs_addr = fs_sock.accept()
+                        if fs_addr[0] == addr[0]:
+                            break
                     with open(os.path.join(fs.Client_Directory, args[0]), 'wb') as file:
                         while True:
-                            file_data = conn.recv(CHUNK_SIZE)
+                            file_data = fs_conn.recv(CHUNK_SIZE)
                             if not file_data:
                                 break
                             file.write(file_data)
