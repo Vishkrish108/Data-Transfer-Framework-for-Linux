@@ -1,0 +1,5 @@
+key.pem
+cert.pem
+user_credentials.txt
+./.venv/
+./server_storage/
