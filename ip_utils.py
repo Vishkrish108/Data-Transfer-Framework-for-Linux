@@ -58,7 +58,7 @@ def character(stdscr):
 
     c = 0
     option = 0
-    while c != 10:
+    while c not in (10, 32):  # 10 is ENTER, 32 is SPACE
         stdscr.erase()
         stdscr.addstr("Select the IP you want to use\n", curses.A_UNDERLINE)
         for i in range(len(ips)):
@@ -77,6 +77,7 @@ def character(stdscr):
 
     global ip
     ip = ips[option]
+
 
 def choose_ip(ip_addr):
     global ips, ip
