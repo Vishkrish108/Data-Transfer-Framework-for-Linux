@@ -389,10 +389,11 @@ class Server:
         """
         print("[ALERT] Shutting down server...")
         self.running = False
-
+        initial_connections=self.active_connections
 
         with self.lock:
             if self.active_connections == 0:
+                print("[ALERT] No active connections. Shutting down server immediately...")
                 self.shutdown_complete.set()
             else:
                 print(f"[ALERT] Waiting for {self.active_connections} active connection(s) to close...")
@@ -407,13 +408,25 @@ class Server:
                     self.shutdown_complete.set()
                     break
                 else:
-                    print(f"[ALERT] Still waiting for {self.active_connections} active connection(s)...")
+                    progress_percentage=100-(self.active_connections/initial_connections)*100
+                    print(f"[ALERT] Progress: {progress_percentage}% closed. Still waiting for {self.active_connections} active connection(s)...")
                     if hasattr(self, 'client_addresses'):
                         for addr in self.client_addresses:
-                            print(f" - Connection with {addr}")
+                            with self.lock:         # basically for a visual gimmick if wanted
+                                self.progress_states(f'Closing connection {addr}', 4)
+                                print(f" - Connection with {addr}")
             time.sleep(1)
 
         self.shutdown_complete.wait()
         self.executor.shutdown(wait=True)
         print("[ALERT] Server shutdown complete.")
 
+
+    # faking it basically
+    def progress_states(self, task_name, duration):
+        progress=[25,50,75,100]
+        stage_duration= duration/4  #length of progress
+
+        for i in progress:
+            print(f"[ALERT] {task_name}: {i}% completed")
+            time.sleep(stage_duration)

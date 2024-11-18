@@ -85,6 +85,7 @@ def choose_ip(ip_addr):
         ip = ip_addr[0]
     elif len(ip_addr) > 1:
         ips = ip_addr
-        curses.wrapper(character)
-
+        print(ips)
+        id=int(input())
+        ip = ip_addr[id]
     return ip
