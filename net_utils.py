@@ -18,7 +18,7 @@ from handshake_utils import (
 from fs_utils import FS
 from ssl_utils import wrap_client_ssl, wrap_server_ssl
 from ip_utils import DATA_PORT, GREET_PORT, CHUNK_SIZE
-from colors import FG_BLUE, FG_YELLOW, FG_BG_CLEAR
+from colors import FG_BLUE, FG_YELLOW, FG_BG_CLEAR, FG_GREEN, FG_RED
 
 
 class Client:
@@ -34,7 +34,7 @@ class Client:
             self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.client_socket = wrap_client_ssl(self.client_socket)
             self.client_socket.connect((dest_ip, DATA_PORT))
-            print("Connected to server")
+            print(f"{FG_GREEN}Connected to server{FG_BG_CLEAR}")
 
             perform_handshake(self.client_socket, "fs")
 
@@ -48,7 +48,7 @@ class Client:
                 self.client_socket.close()
                 self.client_socket = None
         except Exception as e:
-            print(f"Error connecting to server: {e}")
+            print(f"{FG_RED}Error connecting to server: {e}{FG_BG_CLEAR}")
             if self.client_socket:
                 self.client_socket.close()
                 self.client_socket = None
@@ -233,7 +233,7 @@ class Server:
         self.socks = [self.greet_socket, self.data_socket]
 
         print(
-            f"[ALERT] You are discoverable as {FG_BLUE}{hostname}{FG_BG_CLEAR} @ "
+            f"[{FG_GREEN}ALERT{FG_BG_CLEAR}] You are discoverable as {FG_BLUE}{hostname}{FG_BG_CLEAR} @ "
             f"{FG_BLUE}{ip}{FG_BG_CLEAR}\n"
         )
 
@@ -257,7 +257,7 @@ class Server:
         Handles ping requests from clients.
         """
         print(
-            f"[ALERT] {FG_YELLOW}Ping{FG_BG_CLEAR} from {FG_BLUE}{addr[0]}{FG_BG_CLEAR}"
+            f"[{FG_YELLOW}ALERT{FG_BG_CLEAR}] {FG_YELLOW}Ping{FG_BG_CLEAR} from {FG_BLUE}{addr[0]}{FG_BG_CLEAR}"
         )
         perform_handshake(conn, hostname)
         conn.close()
@@ -387,16 +387,16 @@ class Server:
         """
         Shuts down the server gracefully.
         """
-        print("[ALERT] Shutting down server...")
+        print(f"[{FG_RED}ALERT{FG_BG_CLEAR}] Shutting down server...")
         self.running = False
         initial_connections=self.active_connections
 
         with self.lock:
             if self.active_connections == 0:
-                print("[ALERT] No active connections. Shutting down server immediately...")
+                print(f"[{FG_RED}ALERT{FG_BG_CLEAR}] No active connections. Shutting down server immediately...")
                 self.shutdown_complete.set()
             else:
-                print(f"[ALERT] Waiting for {self.active_connections} active connection(s) to close...")
+                print(f"[{FG_RED}ALERT{FG_BG_CLEAR}] Waiting for {self.active_connections} active connection(s) to close...")
                 if hasattr(self, 'client_addresses'):
                     for addr in self.client_addresses:
                         print(f" - Connection with {addr}")
@@ -409,7 +409,7 @@ class Server:
                     break
                 else:
                     progress_percentage=100-(self.active_connections/initial_connections)*100
-                    print(f"[ALERT] Progress: {progress_percentage}% closed. Still waiting for {self.active_connections} active connection(s)...")
+                    print(f"[{FG_RED}ALERT{FG_BG_CLEAR}] Progress: {progress_percentage}% closed. Still waiting for {self.active_connections} active connection(s)...")
                     if hasattr(self, 'client_addresses'):
                         for addr in self.client_addresses:
                             with self.lock:         # basically for a visual gimmick if wanted
@@ -419,7 +419,7 @@ class Server:
 
         self.shutdown_complete.wait()
         self.executor.shutdown(wait=True)
-        print("[ALERT] Server shutdown complete.")
+        print(f"[{FG_RED}ALERT{FG_BG_CLEAR}] Server shutdown complete.")
 
 
     # faking it basically
