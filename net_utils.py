@@ -1,8 +1,4 @@
-# TODO: investigate server shutdown logic (assigned mainly to vishnu)
-# TODO: add the remove file thing (assigned mainly to varun)
-# TODO: prettify the client and make the prompts look good (assigned to vishal/manas)
-
-
+import logging
 import select
 import socket
 import threading
@@ -375,9 +371,9 @@ class Server:
                 file_data = fs.get(filename)
                 fs_conn.sendall(file_data)
                 fs_conn.shutdown(socket.SHUT_WR)
-            perform_handshake(conn, f"{FG_GREEN}File sent successfully{FG_BG_CLEAR}\n")
+            perform_handshake(conn, f"{FG_GREEN}File received successfully{FG_BG_CLEAR}\n")
         except Exception as e:
-            perform_handshake(conn, f"{FG_RED}Error sending file '{filename}': {e}{FG_BG_CLEAR}\n")
+            perform_handshake(conn, f"{FG_RED}Error receiving file '{filename}': {e}{FG_BG_CLEAR}\n")
         finally:
             fs_sock.close()
 
@@ -401,9 +397,9 @@ class Server:
                     if not data:
                         break
                     file.write(data)
-            perform_handshake(conn, f"{FG_GREEN}File received successfully{FG_BG_CLEAR}\n")
+            perform_handshake(conn, f"{FG_GREEN}File sent successfully{FG_BG_CLEAR}\n")
         except Exception as e:
-            perform_handshake(conn, f"{FG_RED}Error receiving file '{filename}': {e}{FG_BG_CLEAR}\n")
+            perform_handshake(conn, f"{FG_RED}Error sending file '{filename}': {e}{FG_BG_CLEAR}\n")
         finally:
             fs_sock.close()
 
@@ -417,7 +413,7 @@ class Server:
                 credentials = receive_handshake(conn)
                 username_password = credentials.split(":")
                 if len(username_password) != 2:
-                    perform_handshake(conn, f"{FG_RED}invalid credentials{FG_BG_CLEAR}\n")
+                    perform_handshake(conn, f"invalid credentials")
                     conn.close()
                     return
                 username, password = username_password
@@ -426,7 +422,7 @@ class Server:
                     self.handle_fs(conn, addr, username)
                 else:
                     print(f"\n{FG_RED}Invalid credentials from {addr[0]}{FG_BG_CLEAR}\n")
-                    perform_handshake(conn, f"{FG_RED}invalid credentials{FG_BG_CLEAR}\n")
+                    perform_handshake(conn, f"invalid credentials")
                     conn.close()
             elif handshake_mode.startswith("ping"):
                 self.handle_ping(conn, addr, hostname)
