@@ -47,6 +47,7 @@ class Client:
                 print(f"\n{FG_RED}Invalid credentials{FG_BG_CLEAR}\n")
                 self.client_socket.close()
                 self.client_socket = None
+                exit(0)
         except Exception as e:
             print(f"\n{FG_RED}Error connecting to server: {e}{FG_BG_CLEAR}\n")
             if self.client_socket:
@@ -288,14 +289,9 @@ class Server:
                 readable, _, _ = select.select(self.socks, [], [])
                 for sock in readable:
                     conn, addr = sock.accept()
-                    # with self.lock:
-                    #     self.active_connections += 1
-                    # threading.Thread(
-                    #     target=self.handle_client, args=(conn, addr, hostname)
-                    # ).start()
                     self.executor.submit(self.handle_client, conn, addr, hostname)
             except Exception as e:
-                print(f"\n{FG_RED}Error occurred: {e}{FG_BG_CLEAR}\n")
+                print(f"Error occurred: {e}")
                 break
 
     def handle_ping(self, conn, addr, hostname):
@@ -318,6 +314,9 @@ class Server:
         )
         perform_handshake(conn, "accept")
         fs = FS(username)  # Use the authenticated username
+
+        with self.lock:
+            self.active_connections += 1
 
         try:
             while True:
@@ -442,19 +441,14 @@ class Server:
         """
         Shuts down the server gracefully.
         """
-        print(f"\n[{FG_RED}ALERT{FG_BG_CLEAR}] Shutting down server...\n")
+        print("[ALERT] Shutting down server...")
         self.running = False
-        initial_connections = self.active_connections
+        initial_connections=self.active_connections
+        self.active_connections=self.active_connections//2
 
         with self.lock:
             if self.active_connections == 0:
-                print(f"\n[{FG_RED}ALERT{FG_BG_CLEAR}] No active connections. Shutting down server immediately...\n")
                 self.shutdown_complete.set()
-            else:
-                print(f"\n[{FG_RED}ALERT{FG_BG_CLEAR}] Waiting for {self.active_connections} active connection(s) to close...\n")
-                if hasattr(self, 'client_addresses'):
-                    for addr in self.client_addresses:
-                        print(f"\n - Connection with {addr}\n")
 
         # Periodically display what the server is waiting for
         while not self.shutdown_complete.is_set():
@@ -462,16 +456,8 @@ class Server:
                 if self.active_connections == 0:
                     self.shutdown_complete.set()
                     break
-                else:
-                    progress_percentage = 100 - (self.active_connections / initial_connections) * 100
-                    print(f"\n[{FG_RED}ALERT{FG_BG_CLEAR}] Progress: {progress_percentage}% closed. Still waiting for {self.active_connections} active connection(s)...\n")
-                    if hasattr(self, 'client_addresses'):
-                        for addr in self.client_addresses:
-                            with self.lock:  # basically for a visual gimmick if wanted
-                                self.progress_states(f'Closing connection {addr}', 4)
-                                print(f"\n - Connection with {addr}\n")
             time.sleep(1)
 
         self.shutdown_complete.wait()
         self.executor.shutdown(wait=True)
-        print(f"\n[{FG_RED}ALERT{FG_BG_CLEAR}] Server shutdown complete.\n")
+        print("[ALERT] Server shutdown complete.")

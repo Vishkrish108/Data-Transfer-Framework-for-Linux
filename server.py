@@ -12,6 +12,7 @@ def main():
     server = Server()
 
     def shutdown_handler(signum, frame):
+        print(f"\n{FG_RED}Shutdown signal received. Waiting for active connections to close...{FG_BG_CLEAR}")
         server.shutdown_server()
         exit(0)
 
@@ -20,7 +21,7 @@ def main():
     try:
         server.start_server(chosen_ip, hostname)
     except KeyboardInterrupt:
-        server.shutdown_server()
+        shutdown_handler(None, None)
     except Exception as e:
         print(f"\n{FG_RED}Server error: {e}{FG_BG_CLEAR}")
         server.shutdown_server()
