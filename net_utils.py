@@ -16,6 +16,14 @@ from ssl_utils import wrap_client_ssl, wrap_server_ssl
 from ip_utils import DATA_PORT, GREET_PORT, CHUNK_SIZE
 from colors import FG_BLUE, FG_YELLOW, FG_BG_CLEAR, FG_GREEN, FG_RED
 
+logging.basicConfig(
+    filename='server_logs',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+
 
 class Client:
     def __init__(self):
@@ -246,6 +254,7 @@ class Server:
         self.lock = threading.Lock()
         self.shutdown_complete = threading.Event()
         self.ip = None
+        self.client_addresses = []
 
     def get_fs_socket(self):
         """
@@ -304,102 +313,128 @@ class Server:
         """
         Handles file system commands from authenticated clients.
         """
-        print(
-            f"\n[{FG_YELLOW}ALERT{FG_BG_CLEAR}] Connection from {FG_BLUE}{username}{FG_BG_CLEAR} @ "
-            f"{FG_BLUE}{addr[0]}{FG_BG_CLEAR}\n"
-        )
+        logging.info(f"Starting FS session with user '{username}' from {addr[0]}")
         perform_handshake(conn, "accept")
         fs = FS(username)  # Use the authenticated username
-
-        with self.lock:
-            self.active_connections += 1
 
         try:
             while True:
                 data = receive_handshake(conn)
                 if not data or data.strip() == "exit":
+                    logging.info(f"User '{username}' from {addr[0]} disconnected")
                     break
                 cmd, *args = data.strip().split()
+                logging.info(f"User '{username}' from {addr[0]} executed command: {data.strip()}")
                 if cmd == "cat":
                     response = fs.cat(*args)
+                    logging.info(f"'cat' command response for user '{username}': {response.strip()}")
                     perform_handshake(conn, response)
                 elif cmd == "ls":
                     response = fs.ls(*args)
+                    logging.info(f"'ls' command response for user '{username}': {response.strip()}")
                     perform_handshake(conn, response)
                 elif cmd == "get":
-                    self.handle_get(conn, fs, args)
+                    self.handle_get(conn, fs, args, username, addr)
                 elif cmd == "put":
-                    self.handle_put(conn, fs, args)
+                    self.handle_put(conn, fs, args, username, addr)
                 elif cmd == "rm":
                     response = fs.rm(*args)
+                    logging.info(f"'rm' command response for user '{username}': {response.strip()}")
                     perform_handshake(conn, response)
                 elif cmd == "mkdir":
                     response = fs.mkdir(*args)
+                    logging.info(f"'mkdir' command response for user '{username}': {response.strip()}")
                     perform_handshake(conn, response)
                 elif cmd == "rmdir":
                     response = fs.rmdir(*args)
+                    logging.info(f"'rmdir' command response for user '{username}': {response.strip()}")
                     perform_handshake(conn, response)
                 elif cmd == "cd":
                     response = fs.cd(*args)
+                    logging.info(f"'cd' command response for user '{username}': {response.strip()}")
                     perform_handshake(conn, response)
                 else:
-                    perform_handshake(conn, f"{FG_RED}Unknown command{FG_BG_CLEAR}\n")
+                    response = f"{FG_RED}Unknown command{FG_BG_CLEAR}\n"
+                    logging.warning(f"User '{username}' sent unknown command: {cmd}")
+                    perform_handshake(conn, response)
         except Exception as e:
+            logging.error(f"Error handling FS operations for user '{username}': {e}")
             perform_handshake(conn, f"{FG_RED}Error handling command: {e}{FG_BG_CLEAR}\n")
         finally:
             conn.close()
             with self.lock:
                 self.active_connections -= 1
+                if addr in self.client_addresses:
+                    self.client_addresses.remove(addr)
                 if not self.running and self.active_connections == 0:
                     self.shutdown_complete.set()
 
-    def handle_get(self, conn, fs, args):
+
+    def handle_get(self, conn, fs, args, username, addr):
         """
         Handles the 'get' command to send a file to the client.
         """
         if not args:
-            perform_handshake(conn, f"{FG_RED}No filename provided for get command.{FG_BG_CLEAR}\n")
+            response = f"{FG_RED}No filename provided for get command.{FG_BG_CLEAR}\n"
+            logging.warning(f"User '{username}' from {addr[0]} tried 'get' without filename")
+            perform_handshake(conn, response)
             return
 
         filename = args[0]
         fs_sock, fs_port = self.get_fs_socket()
         perform_handshake(conn, f"{fs_port}\n")
+        logging.info(f"User '{username}' from {addr[0]} initiated 'get' for file '{filename}'")
 
         try:
-            fs_conn, fs_addr = fs_sock.accept()
-            with fs_conn:
-                file_data = fs.get(filename)
-                fs_conn.sendall(file_data)
-                fs_conn.shutdown(socket.SHUT_WR)
-            perform_handshake(conn, f"{FG_GREEN}File received successfully{FG_BG_CLEAR}\n")
+            with fs_sock:
+                fs_conn, fs_addr = fs_sock.accept()
+                with fs_conn:
+                    file_data = fs.get(filename)
+                    fs_conn.sendall(file_data)
+                    fs_conn.shutdown(socket.SHUT_WR)
+            response = f"{FG_GREEN}File sent successfully{FG_BG_CLEAR}\n"
+            logging.info(f"File '{filename}' sent to user '{username}' from {addr[0]}")
+            perform_handshake(conn, response)
         except Exception as e:
-            perform_handshake(conn, f"{FG_RED}Error receiving file '{filename}': {e}{FG_BG_CLEAR}\n")
+            response = f"{FG_RED}Error sending file '{filename}': {e}{FG_BG_CLEAR}\n"
+            logging.error(f"Error sending file '{filename}' to user '{username}' from {addr[0]}: {e}")
+            perform_handshake(conn, response)
         finally:
             fs_sock.close()
 
-    def handle_put(self, conn, fs, args):
+    def handle_put(self, conn, fs, args, username, addr):
         """
         Handles the 'put' command to receive a file from the client.
         """
         if not args:
-            perform_handshake(conn, f"{FG_RED}No filename provided for put command.{FG_BG_CLEAR}\n")
+            response = f"{FG_RED}No filename provided for put command.{FG_BG_CLEAR}\n"
+            logging.warning(f"User '{username}' from {addr[0]} tried 'put' without filename")
+            perform_handshake(conn, response)
             return
 
         filename = args[0]
         fs_sock, fs_port = self.get_fs_socket()
         perform_handshake(conn, f"{fs_port}\n")
+        logging.info(f"User '{username}' from {addr[0]} initiated 'put' for file '{filename}'")
 
         try:
-            fs_conn, fs_addr = fs_sock.accept()
-            with fs_conn, open(os.path.join(fs.current_path, filename), 'wb') as file:
-                while True:
-                    data = fs_conn.recv(CHUNK_SIZE)
-                    if not data:
-                        break
-                    file.write(data)
-            perform_handshake(conn, f"{FG_GREEN}File sent successfully{FG_BG_CLEAR}\n")
+            with fs_sock:
+                fs_conn, fs_addr = fs_sock.accept()
+                with fs_conn:
+                    file_path = os.path.join(fs.current_path, filename)
+                    with open(file_path, 'wb') as file:
+                        while True:
+                            data = fs_conn.recv(CHUNK_SIZE)
+                            if not data:
+                                break
+                            file.write(data)
+            response = f"{FG_GREEN}File received successfully{FG_BG_CLEAR}\n"
+            logging.info(f"File '{filename}' received from user '{username}' at {addr[0]}")
+            perform_handshake(conn, response)
         except Exception as e:
-            perform_handshake(conn, f"{FG_RED}Error sending file '{filename}': {e}{FG_BG_CLEAR}\n")
+            response = f"{FG_RED}Error receiving file '{filename}': {e}{FG_BG_CLEAR}\n"
+            logging.error(f"Error receiving file '{filename}' from user '{username}' at {addr[0]}: {e}")
+            perform_handshake(conn, response)
         finally:
             fs_sock.close()
 
@@ -407,31 +442,47 @@ class Server:
         """
         Handles incoming client connections and authentication.
         """
+        with self.lock:
+            self.active_connections += 1
+            self.client_addresses.append(addr)
         try:
             handshake_mode = receive_handshake(conn)
             if handshake_mode.startswith("fs"):
                 credentials = receive_handshake(conn)
                 username_password = credentials.split(":")
                 if len(username_password) != 2:
-                    perform_handshake(conn, f"invalid credentials")
+                    logging.warning(f"Invalid credentials format from {addr[0]}")
+                    perform_handshake(conn, "invalid credentials")
                     conn.close()
                     return
                 username, password = username_password
                 if verify_user(username, password):
+                    logging.info(f"User '{username}' authenticated successfully from {addr[0]}")
                     print(f"\n{FG_GREEN}User {username} authenticated from {addr[0]}{FG_BG_CLEAR}\n")
                     self.handle_fs(conn, addr, username)
                 else:
+                    logging.warning(f"Invalid credentials from {addr[0]} for username '{username}'")
                     print(f"\n{FG_RED}Invalid credentials from {addr[0]}{FG_BG_CLEAR}\n")
-                    perform_handshake(conn, f"invalid credentials")
+                    perform_handshake(conn, "invalid credentials")
                     conn.close()
             elif handshake_mode.startswith("ping"):
                 self.handle_ping(conn, addr, hostname)
             else:
+                logging.warning(f"Unknown handshake mode '{handshake_mode}' from {addr[0]}")
                 print(f"\n{FG_RED}Unknown handshake mode from {addr[0]}{FG_BG_CLEAR}\n")
                 conn.close()
         except Exception as e:
+            logging.error(f"Error during handshake with {addr[0]}: {e}")
             perform_handshake(conn, f"{FG_RED}Error during handshake: {e}{FG_BG_CLEAR}\n")
             conn.close()
+        finally:
+            conn.close()
+            with self.lock:
+                self.active_connections -= 1
+                if addr in self.client_addresses:
+                    self.client_addresses.remove(addr)
+                if not self.running and self.active_connections == 0:
+                    self.shutdown_complete.set()
 
     def shutdown_server(self):
         """
