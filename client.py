@@ -12,20 +12,20 @@ def main():
     client.run_scan(ip_range)
 
     if client.devices:
-        print(f"{FG_GREEN}Available devices:{FG_BG_CLEAR}")
+        print(f"\n{FG_GREEN}Available devices:{FG_BG_CLEAR}\n")
         for i, device in enumerate(client.devices):
             print(f"{i}: {device[0]} ({device[1]})")
 
-        choice = int(input(f"{FG_CYAN}Select a device to connect to: {FG_BG_CLEAR}"))
+        choice = int(input(f"\n{FG_CYAN}Select a device to connect to: {FG_BG_CLEAR}"))
         dest_ip = client.devices[choice][0]
         client.start_connection(dest_ip)
 
         while True:
-            command = input(f"{FG_YELLOW}Enter command (cat, ls, get, put, cd): {FG_BG_CLEAR}")
+            command = input(f"\n{FG_YELLOW}Enter command (cat, ls, get, put, cd): {FG_BG_CLEAR}")
             response = client.send_fs_command(command)
-            print(response)
+            print(f"\n{response}\n")
     else:
-        print(f"{FG_RED}No devices found.{FG_BG_CLEAR}")
+        print(f"\n{FG_RED}No devices found.{FG_BG_CLEAR}\n")
 
 
 if __name__ == "__main__":

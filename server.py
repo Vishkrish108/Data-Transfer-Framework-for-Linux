@@ -2,6 +2,7 @@ import ip_utils
 from net_utils import Server
 import signal
 import threading
+from colors import FG_RED, FG_BG_CLEAR
 
 
 def main():
@@ -21,7 +22,7 @@ def main():
     except KeyboardInterrupt:
         server.shutdown_server()
     except Exception as e:
-        print(f"Server error: {e}")
+        print(f"\n{FG_RED}Server error: {e}{FG_BG_CLEAR}")
         server.shutdown_server()
 
 
