@@ -98,6 +98,14 @@ class Client:
                 return self.handle_get(args)
             elif cmd == "put":
                 return self.handle_put(args)
+            elif cmd == "rm":
+                return self.handle_rm(args)
+            elif cmd == "mkdir":
+                return self.handle_mkdir(args)
+            elif cmd == "rmdir":
+                return self.handle_rmdir(args)
+            elif cmd == "exit":
+                return self.handle_exit()
             else:
                 return self.handle_other_commands(cmd, args)
         except Exception as e:
@@ -173,6 +181,43 @@ class Client:
         response = receive_handshake(self.client_socket)
         return f"\n{FG_GREEN}{response}{FG_BG_CLEAR}\n"
 
+    def handle_rm(self, args):
+        """
+        Handles the 'rm' command to remove a file on the server.
+        """
+        if not args:
+            return f"\n{FG_RED}No filename provided for rm command.{FG_BG_CLEAR}\n"
+        perform_handshake(self.client_socket, f"rm {args[0]}")
+        response = receive_handshake(self.client_socket)
+        return f"\n{FG_GREEN}{response}{FG_BG_CLEAR}\n"
+
+    def handle_mkdir(self, args):
+        """
+        Handles the 'mkdir' command to create a directory on the server.
+        """
+        if not args:
+            return f"\n{FG_RED}No directory name provided for mkdir command.{FG_BG_CLEAR}\n"
+        perform_handshake(self.client_socket, f"mkdir {args[0]}")
+        response = receive_handshake(self.client_socket)
+        return f"\n{FG_GREEN}{response}{FG_BG_CLEAR}\n"
+
+    def handle_rmdir(self, args):
+        """
+        Handles the 'rmdir' command to remove a directory on the server.
+        """
+        if not args:
+            return f"\n{FG_RED}No directory name provided for rmdir command.{FG_BG_CLEAR}\n"
+        perform_handshake(self.client_socket, f"rmdir {args[0]}")
+        response = receive_handshake(self.client_socket)
+        return f"\n{FG_GREEN}{response}{FG_BG_CLEAR}\n"
+
+    def handle_exit(self):
+        """
+        Handles the 'exit' command to gracefully terminate the client connection.
+        """
+        self.close_connection()
+        exit(0)
+
     def run_scan(self, iprange):
         """
         Scans a range of IP addresses to find available devices.
@@ -189,6 +234,8 @@ class Client:
             thread.join()
 
         self.devices = list(set(self.devices))
+
+
 
 
 class Server:
@@ -288,6 +335,15 @@ class Server:
                     self.handle_get(conn, fs, args)
                 elif cmd == "put":
                     self.handle_put(conn, fs, args)
+                elif cmd == "rm":
+                    response = fs.rm(*args)
+                    perform_handshake(conn, response)
+                elif cmd == "mkdir":
+                    response = fs.mkdir(*args)
+                    perform_handshake(conn, response)
+                elif cmd == "rmdir":
+                    response = fs.rmdir(*args)
+                    perform_handshake(conn, response)
                 elif cmd == "cd":
                     response = fs.cd(*args)
                     perform_handshake(conn, response)

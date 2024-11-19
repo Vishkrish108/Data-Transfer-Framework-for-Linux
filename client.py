@@ -21,7 +21,7 @@ def main():
         client.start_connection(dest_ip)
 
         while True:
-            command = input(f"\n{FG_YELLOW}Enter command (cat, ls, get, put, cd): {FG_BG_CLEAR}")
+            command = input(f"\n{FG_YELLOW}Enter command (cat, ls, get, put, cd, rm, mkdir, rmdir, exit): {FG_BG_CLEAR}")
             response = client.send_fs_command(command)
             print(f"\n{response}\n")
     else:
