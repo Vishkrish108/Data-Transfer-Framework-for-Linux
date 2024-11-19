@@ -490,7 +490,6 @@ class Server:
         """
         print("[ALERT] Shutting down server...")
         self.running = False
-        initial_connections=self.active_connections
         self.active_connections=self.active_connections//2
 
         with self.lock:
@@ -500,7 +499,7 @@ class Server:
         # Periodically display what the server is waiting for
         while not self.shutdown_complete.is_set():
             with self.lock:
-                if self.active_connections == 0:
+                if self.active_connections <= 0:
                     self.shutdown_complete.set()
                     break
             time.sleep(1)
