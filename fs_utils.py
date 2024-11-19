@@ -1,5 +1,5 @@
 import os
-from colors import FG_RED, FG_GREEN, FG_BG_CLEAR
+from colors import FG_RED, FG_GREEN, FG_BG_CLEAR, FG_BLUE
 
 class FS:
 
@@ -61,6 +61,8 @@ class FS:
             if not self.is_valid_path(directory_path):
                 return f"{FG_RED}Access denied{FG_BG_CLEAR}\n"
             files = os.listdir(os.path.normpath(os.path.join(self.current_path, directory_path)))
+            if not files:
+                return f"{FG_BLUE}No files found{FG_BG_CLEAR}\n"
             return "\t".join(files) + "\n"
         except OSError as error:
             return f"{FG_RED}{str(error)}{FG_BG_CLEAR}\n"
