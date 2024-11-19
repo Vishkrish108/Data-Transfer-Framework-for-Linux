@@ -494,7 +494,7 @@ class Server:
         self.active_connections=self.active_connections//2
 
         with self.lock:
-            if self.active_connections == 0:
+            if self.active_connections <= 0:
                 self.shutdown_complete.set()
 
         # Periodically display what the server is waiting for
