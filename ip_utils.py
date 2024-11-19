@@ -2,7 +2,7 @@ import socket
 import netifaces
 import ipaddress
 import curses
-from colors import *
+from colors import FG_GREEN, FG_RED, FG_CYAN, FG_YELLOW, FG_BG_CLEAR
 
 DATA_PORT = 5001
 CONTROL_PORT = 5002
@@ -85,7 +85,9 @@ def choose_ip(ip_addr):
         ip = ip_addr[0]
     elif len(ip_addr) > 1:
         ips = ip_addr
-        print(ips)
-        id=int(input())
+        print(f"\n{FG_GREEN}Available IP addresses:{FG_BG_CLEAR}\n")
+        for i, ip in enumerate(ips):
+            print(f"{i}: {ip}")
+        id = int(input(f"\n{FG_CYAN}Select an IP address by entering the corresponding number: {FG_BG_CLEAR}"))
         ip = ip_addr[id]
     return ip
