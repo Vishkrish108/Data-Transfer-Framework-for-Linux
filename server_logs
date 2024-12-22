@@ -1,0 +1,14 @@
+2024-11-19 23:10:53 - INFO - User 'u' authenticated successfully from 10.255.255.254
+2024-11-19 23:10:53 - INFO - Starting FS session with user 'u' from 10.255.255.254
+2024-11-19 23:11:37 - INFO - User 'u' from 10.255.255.254 disconnected
+2024-11-19 23:13:13 - INFO - User 'u' authenticated successfully from 10.255.255.254
+2024-11-19 23:13:13 - INFO - Starting FS session with user 'u' from 10.255.255.254
+2024-11-19 23:13:17 - INFO - User 'u' from 10.255.255.254 executed command: ls
+2024-11-19 23:13:17 - INFO - 'ls' command response for user 'u': submission.csv	user_credentials.txt
+2024-11-19 23:13:19 - INFO - User 'u' from 10.255.255.254 disconnected
+2024-11-19 23:14:53 - INFO - User 'u' authenticated successfully from 10.255.255.254
+2024-11-19 23:14:53 - INFO - Starting FS session with user 'u' from 10.255.255.254
+2024-11-19 23:15:01 - INFO - User 'u' from 10.255.255.254 disconnected
+2024-11-19 23:16:54 - INFO - User 'u' authenticated successfully from 10.255.255.254
+2024-11-19 23:16:54 - INFO - Starting FS session with user 'u' from 10.255.255.254
+2024-11-19 23:16:57 - INFO - User 'u' from 10.255.255.254 disconnected
